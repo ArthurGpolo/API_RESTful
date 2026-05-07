@@ -4,8 +4,15 @@ const User = require('../models/User');
 async function listUsers(req, res, next) {
   try {
     const { page, limit } = req.query;
+
     const result = await User.findAll({ page, limit });
-    res.json(result);
+
+    res.json({
+      usuarios: result.data,
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+    });
   } catch (err) {
     next(err);
   }

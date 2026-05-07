@@ -1,139 +1,128 @@
 import { useEffect, useState, useCallback } from 'react';
-import { apiFetch } from '@/lib/api';
+import api from '@/services/api';
 
-
-// URL base da API
 const API_BASE_URL = '/auth';
 
 export function useAuth({
-    initialUser = null,
-    fetchOnMount = true
-} = {}
-) {
-    // Estado com o usuário
-    const [user, setUser] = useState(initialUser)
-    const [isAuthenticated, setIsAuthenticated] = useState(false)
-    const [checkedAuth, setCheckedAuth] = useState(false);
+  initialUser = null,
+  fetchOnMount = true,
+} = {}) {
 
-    // Estado que indica se há uma requisição em andamento
-    const [loading, setLoading] = useState({
-        login: false,
-        perfil: false,
-        logout: false,
-    });
+  const [user, setUser] = useState(initialUser);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [checkedAuth, setCheckedAuth] = useState(false);
 
-    // Estado para armazenar mensagem de erro (se houver)
-    const [error, setError] = useState({
-        login: null,
-        perfil: null,
-    });
+  const [loading, setLoading] = useState({
+    login: false,
+    perfil: false,
+    logout: false,
+  });
 
-    // Função para fazer login
-    const login = useCallback(async (dadosLogin) => {
-        setLoading((prev) => ({ ...prev, login: true }));
-        setError((prev) => ({ ...prev, login: null }));
+  const [error, setError] = useState({
+    login: null,
+    perfil: null,
+  });
 
-        try {
-            // Chamada à API
-            const data = await apiFetch(`${API_BASE_URL}/login`, {
-                method: 'POST',
-                body: JSON.stringify(dadosLogin),
-                ignoreAuthError: true
-            });
+  // LOGIN
+  const login = useCallback(async (dadosLogin) => {
+    setLoading((prev) => ({ ...prev, login: true }));
+    setError((prev) => ({ ...prev, login: null }));
 
-            // Se a resposta veio com status de erro
-            if (!data.sucesso) {
-                setError((prev) => ({ ...prev, login: data.mensagem }))
-            }
-            else {
-                // Atualizando o estado dos dados
-                setUser(data.dados.usuario)
-                setIsAuthenticated(true)
-            }
-        } catch (err) {
-            // Caso dê erro de rede, CORS, servidor, etc, guardamos uma mensagem amigável em `error`
-            if (err.message === 'Sessão expirada') return;
+    try {
+      const data = await api.post(`${API_BASE_URL}/login`, dadosLogin);
 
-            setError((prev) => ({
-                ...prev,
-                login: 'Erro ao solicitar login, tente novamente mais tarde.'
-            }));
+      if (!data?.sucesso) {
+        setError((prev) => ({ ...prev, login: data?.mensagem || 'Erro no login' }));
+        setIsAuthenticated(false);
+        return;
+      }
 
-        } finally {
-            // Independente de sucesso ou erro, o loading termina aqui
-            setLoading((prev) => ({ ...prev, login: false }));
-        }
-    }, []);
+      setUser(data.dados.usuario);
+      setIsAuthenticated(true);
+    } catch (err) {
+      if (err?.message === 'Sessão expirada') return;
 
-    // Função para obter o perfil do usuário logado
-    const perfil = useCallback(async () => {
-        setLoading((prev) => ({ ...prev, perfil: true }));
-        setError((prev) => ({ ...prev, perfil: null }));
+      setError((prev) => ({
+        ...prev,
+        login: 'Erro ao solicitar login, tente novamente mais tarde.',
+      }));
 
-        try {
-            // Chamada à API
-            const data = await apiFetch(`${API_BASE_URL}/perfil`, {
-                method: 'GET',
-                credentials: 'include'
-            });
+      setIsAuthenticated(false);
+    } finally {
+      setLoading((prev) => ({ ...prev, login: false }));
+    }
+  }, []);
 
-            // Se a resposta veio com status de erro
-            if (!data.sucesso) {
-                setError((prev) => ({ ...prev, perfil: data.mensagem }))
-                setUser(null)
-            }
-            else {
-                // Atualizando o estado do usuário
-                setUser(data.dados.usuario)
-                setIsAuthenticated(true)
-            }
+  // PERFIL
+  const perfil = useCallback(async () => {
+    setLoading((prev) => ({ ...prev, perfil: true }));
+    setError((prev) => ({ ...prev, perfil: null }));
 
-        } catch (err) {
-            // Caso dê erro de rede, CORS, servidor, etc, guardamos uma mensagem amigável em `error`
-            setError((prev) => ({ ...prev, perfil: 'Erro ao solicitar perfil, tente novamente mais tarde.' }))
+    try {
+      const data = await api.get(`${API_BASE_URL}/perfil`);
 
-        } finally {
-            // Independente de sucesso ou erro, o loading termina aqui
-            setLoading((prev) => ({ ...prev, perfil: false }));
-            setCheckedAuth(true);
-        }
-    }, []);
+      if (!data?.sucesso) {
+        setUser(null);
+        setIsAuthenticated(false);
 
-    // Função para fazer logout
-    const logout = async () => {
-        setLoading((prev) => ({ ...prev, logout: true }));
+        setError((prev) => ({
+          ...prev,
+          perfil: data?.mensagem || 'Erro ao carregar perfil',
+        }));
 
-        try {
-            await apiFetch(`${API_BASE_URL}/logout`, {
-                method: 'POST',
-                credentials: 'include'
-            });
+        return;
+      }
 
-            // Limpando estados locais
-            setUser(null);
-            setIsAuthenticated(false)
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading((prev) => ({ ...prev, logout: false }));
-        }
-    };
+      setUser(data.dados.usuario);
+      setIsAuthenticated(true);
+    } catch (err) {
+      setUser(null);
+      setIsAuthenticated(false);
 
-    // Obtendo o perfil
-    useEffect(() => {
-        if (!fetchOnMount) return;
-        perfil();
-    }, [fetchOnMount, perfil]);
+      setError((prev) => ({
+        ...prev,
+        perfil: 'Erro ao solicitar perfil, tente novamente mais tarde.',
+      }));
+    } finally {
+      setLoading((prev) => ({ ...prev, perfil: false }));
+      setCheckedAuth(true);
+    }
+  }, []);
 
-    return {
-        user,
-        isAuthenticated,
-        checkedAuth,
-        loading,
-        setLoading,
-        error,
-        login,
-        perfil,
-        logout,
-    };
+  // LOGOUT
+  const logout = useCallback(async () => {
+    setLoading((prev) => ({ ...prev, logout: true }));
+
+    try {
+      await api.post(`${API_BASE_URL}/logout`);
+
+      setUser(null);
+      setIsAuthenticated(false);
+    } catch (err) {
+      console.error('Erro no logout:', err);
+    } finally {
+      setLoading((prev) => ({ ...prev, logout: false }));
+    }
+  }, []);
+
+  // AUTO FETCH PERFIL
+  useEffect(() => {
+    if (!fetchOnMount) {
+      setCheckedAuth(true);
+      return;
+    }
+
+    perfil();
+  }, [fetchOnMount, perfil]);
+
+  return {
+    user,
+    isAuthenticated,
+    checkedAuth,
+    loading,
+    error,
+    login,
+    perfil,
+    logout,
+  };
 }

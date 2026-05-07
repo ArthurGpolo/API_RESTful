@@ -17,9 +17,24 @@ export default function LoginPage() {
     e.preventDefault();
 
     try {
-      await login(form.email, form.password);
+      // 👇 login precisa retornar { user, token }
+      const res = await login(form.email, form.password);
 
-      router.push("/dashboard");
+      const user = res?.user;
+
+      console.log("USER LOGADO:", user);
+
+      if (!user) {
+        throw new Error("Usuário não retornado pelo login");
+      }
+
+      // ✅ REDIRECIONAMENTO CORRETO (baseado na sua estrutura de pastas)
+      if (user.role === "admin") {
+        router.push("/dashboard/admin");
+      } else {
+        router.push("/dashboard/usuarios");
+      }
+
     } catch (err) {
       const message =
         err.response?.data?.message ||
@@ -27,7 +42,7 @@ export default function LoginPage() {
           ? "Email ou senha inválidos"
           : "Erro no servidor");
 
-      console.log("FRONT ERROR:", err.response?.data);
+      console.log("FRONT ERROR:", err.response?.data || err);
 
       alert(message);
     }
