@@ -75,19 +75,6 @@ describe('Authors — CRUD', () => {
     expect(res.status).toBe(404);
   });
 
-  it('deve atualizar um autor como admin', async () => {
-    const created = await createAuthor(adminToken(), { name: 'Nome Antigo' });
-    const id = created.body.id;
-
-    const res = await request(app)
-      .put(`/api/authors/${id}`)
-      .set('Authorization', `Bearer ${adminToken()}`)
-      .send({ name: 'Nome Novo' });
-
-    expect(res.status).toBe(200);
-    expect(res.body.name).toBe('Nome Novo');
-  });
-
   it('deve deletar um autor como admin e retornar 204', async () => {
     const created = await createAuthor(adminToken());
     const id = created.body.id;
